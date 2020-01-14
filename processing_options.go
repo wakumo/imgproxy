@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"os"
 
 	"github.com/imgproxy/imgproxy/structdiff"
 )
@@ -277,10 +278,12 @@ func decodeBase64URL(parts []string) (string, string, error) {
 		format = urlParts[1]
 	}
 
-	imageURL, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(urlParts[0], "="))
+	imageURL_base64, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(urlParts[0], "="))
 	if err != nil {
 		return "", "", fmt.Errorf("Invalid url encoding: %s", encoded)
 	}
+	var imageURL = salsa20_decode(imageURL_base64)
+	imageURL = os.Getenv("GCS_HOST") + imageURL
 
 	fullURL := fmt.Sprintf("%s%s", conf.BaseURL, string(imageURL))
 

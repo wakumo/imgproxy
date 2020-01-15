@@ -228,7 +228,7 @@ type config struct {
 }
 
 var conf = config{
-	Bind:                           ":8080",
+	Bind:                           "0.0.0.0:8080",
 	ReadTimeout:                    10,
 	WriteTimeout:                   10,
 	KeepAliveTimeout:               10,

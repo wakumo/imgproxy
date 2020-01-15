@@ -1,159 +1,51 @@
-version: 2.1
+version: 2
+jobs:
+  deploy_prod:
+    docker:
+      - image: gcr.io/cloud-builders/gcloud
+    environment:
+      GCP_PROJECT: sumica-production
+      GCP_ZONE: asia-northeast1-a
+
+      K8S_CLUSTER: production-cluster
+      K8S_NAMESPAGE: production
+      K8S_DEPLOYMENT_NAME: imgproxy
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            apt-get update && apt-get install python python-pip jq -y
+            gcloud --quiet components update
+            gcloud --quiet components update kubectl
+      - run:
+          name: Auth gcloud
+          command: |
+            echo $GCLOUD_PROD_SERVICE_KEY | base64 --decode --ignore-garbage > ${HOME}/gcp_key.json
+            gcloud auth activate-service-account --key-file ${HOME}/gcp_key.json
+            gcloud config set project ${GCP_PROJECT}
+
+      - run:
+          name: Build prod image
+          command: gcloud builds submit . --config ./.circleci/cloudbuild.yaml --substitutions _REPO_NAME=$(tr [A-Z] [a-z] <<< ${CIRCLE_PROJECT_REPONAME}),_TAG_NAME=${CIRCLE_TAG}
+
+      - run:
+          name: Get credentials
+          command: gcloud container clusters get-credentials ${K8S_CLUSTER} --quiet --zone ${GCP_ZONE} --project ${GCP_PROJECT}
+
+      # - run:
+      #     name: rollout-update
+      #     command: |
+      #       K8S_CONTAINER_NAME=$(echo $(kubectl --namespace=${K8S_NAMESPAGE} get deployment ${K8S_DEPLOYMENT_NAME} -o json | jq '.spec.template.spec.containers[0].name') | sed 's#"##g')
+      #       kubectl set image deployment/${K8S_DEPLOYMENT_NAME} ${K8S_CONTAINER_NAME}=gcr.io/${GCP_PROJECT}/$(tr [A-Z] [a-z] <<< ${CIRCLE_PROJECT_REPONAME}):${CIRCLE_TAG} --namespace=${K8S_NAMESPAGE}
 
 workflows:
-  version: 2
-  build:
-    jobs:
-      - checkout_code
-      - lint:
-          requires:
-            - checkout_code
-          go_version: "1.13"
-          vips_version: "8.8"
-      - build:
-          name: go1.13_vips8.8
-          requires:
-            - checkout_code
-          go_version: "1.13"
-          vips_version: "8.8"
-      - build:
-          name: go1.13_vips8.7
-          requires:
-            - checkout_code
-          go_version: "1.13"
-          vips_version: "8.7"
-      - build:
-          name: go1.13_vips8.6
-          requires:
-            - checkout_code
-          go_version: "1.13"
-          vips_version: "8.6"
-      - build:
-          name: go1.12_vips8.8
-          requires:
-            - checkout_code
-          go_version: "1.12"
-          vips_version: "8.8"
-      - build:
-          name: go1.12_vips8.7
-          requires:
-            - checkout_code
-          go_version: "1.12"
-          vips_version: "8.7"
-      - build:
-          name: go1.12_vips8.6
-          requires:
-            - checkout_code
-          go_version: "1.12"
-          vips_version: "8.6"
-      - build:
-          name: go1.11_vips8.8
-          requires:
-            - checkout_code
-          go_version: "1.11.13"
-          vips_version: "8.8"
-      - build:
-          name: go1.11_vips8.7
-          requires:
-            - checkout_code
-          go_version: "1.11.13"
-          vips_version: "8.7"
-      - build:
-          name: go1.11_vips8.6
-          requires:
-            - checkout_code
-          go_version: "1.11.13"
-          vips_version: "8.6"
-
-executors:
-  imgproxy:
-    docker:
-      - image: "darthsim/imgproxy-circleci:latest"
-    working_directory: /go/src/imgproxy
-    environment:
-      BASH_ENV: "/root/.bashrc"
-
-commands:
-  setup_vips:
-    parameters:
-      vips_version:
-        type: string
-    steps:
-      - run:
-          name: Setup Vips
-          command: |
-            echo 'LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/root/vips/<< parameters.vips_version >>/lib"' >> $BASH_ENV
-            echo 'PKG_CONFIG_PATH="$PKG_CONFIG_PATH:/root/vips/<< parameters.vips_version >>/lib/pkgconfig"' >> $BASH_ENV
-
-  install_go:
-    parameters:
-      go_version:
-        type: string
-    steps:
-      - run:
-          name: Install Go
-          command: |
-            gvm install go<< parameters.go_version >> -B
-            gvm use go<< parameters.go_version >> --default
-            echo 'export GO111MODULE=on' >> $BASH_ENV
-            echo 'export GOPATH=/go' >> $BASH_ENV
-            echo 'export PATH="$PATH:$(go env GOPATH)/bin"' >> $BASH_ENV
-            echo 'export CGO_LDFLAGS_ALLOW="-s|-w"' >> $BASH_ENV
-
-jobs:
-  checkout_code:
-    docker:
-      - image: circleci/slim-base:latest
-    working_directory: /go/src/imgproxy
-    steps:
-      - checkout:
-          path: /go/src/imgproxy
-      - persist_to_workspace:
-          root: .
-          paths: [.]
-
-  lint:
-    executor: imgproxy
-    parameters:
-      vips_version:
-        type: string
-      go_version:
-        type: string
-    steps:
-      - attach_workspace:
-          at: .
-      - setup_vips:
-          vips_version: << parameters.vips_version >>
-      - install_go:
-          go_version: << parameters.go_version >>
-      - run:
-          name: Install golangci-lint
-          command: curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | BINARY=golangci-lint sh -s -- -b $(go env GOPATH)/bin v1.18.0
-      - run:
-          name: Lint imgproxy
-          command: golangci-lint run .
-
-  build:
-    executor: imgproxy
-    parameters:
-      vips_version:
-        type: string
-      go_version:
-        type: string
-    steps:
-      - attach_workspace:
-          at: .
-      - setup_vips:
-          vips_version: << parameters.vips_version >>
-      - install_go:
-          go_version: << parameters.go_version >>
-      - restore_cache:
-          keys:
-            - go-modules-{{ checksum "go.sum" }}
-      - run:
-          name: Build imgproxy
-          command: go test -v
-      - save_cache:
-          key: go-modules-{{ checksum "go.sum" }}
-          paths:
-            - "/go/pkg/mod"
+    version: 2
+    deploy_prod:
+      jobs:
+        - deploy_prod:
+            filters:
+              tags:
+                only: /prod-\d+.\d+.\d+/
+              branches:
+                ignore: /.*/

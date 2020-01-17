@@ -21,8 +21,8 @@ func buildRouter() *router {
 
 	r.PanicHandler = handlePanic
 
-	r.GET("/", handleLanding, true)
-	r.GET("/health", handleHealth, true)
+	// r.GET("/", handleLanding, true)
+	// r.GET("/health", handleHealth, true)
 	r.GET("/favicon.ico", handleFavicon, true)
 	r.GET("/", withCORS(withSecret(handleProcessing)), false)
 	r.OPTIONS("/", withCORS(handleOptions), false)

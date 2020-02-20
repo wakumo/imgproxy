@@ -17,10 +17,10 @@ var (
 	downloadClient  *http.Client
 	imageDataCtxKey = ctxKey("imageData")
 
-	errSourceDimensionsTooBig      = newError(422, "Source image dimensions are too big", "Invalid source image")
-	errSourceResolutionTooBig      = newError(422, "Source image resolution is too big", "Invalid source image")
-	errSourceFileTooBig            = newError(422, "Source image file is too big", "Invalid source image")
-	errSourceImageTypeNotSupported = newError(422, "Source image type not supported", "Invalid source image")
+	errSourceDimensionsTooBig      = newError(422, "Source image dimensions are too big", "Invalid source image Source image dimensions are too big")
+	errSourceResolutionTooBig      = newError(422, "Source image resolution is too big", "Invalid source image Source image resolution is too big")
+	errSourceFileTooBig            = newError(422, "Source image file is too big", "Invalid source image Source image file is too big")
+	errSourceImageTypeNotSupported = newError(422, "Source image type not supported", "Invalid source image Source image type not supported")
 )
 
 const msgSourceImageIsUnreachable = "Source image is unreachable"

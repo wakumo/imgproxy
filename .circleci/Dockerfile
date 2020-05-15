@@ -1,24 +1,69 @@
-FROM debian:buster
+FROM golang:1-buster
 
-RUN apt-get -qq update \
-  && apt-get install -y --no-install-recommends bash ca-certificates build-essential \
-  curl git mercurial make binutils bison gcc gobject-introspection libglib2.0-dev \
-  libexpat1-dev libxml2-dev libfftw3-dev libjpeg-dev libpng-dev libwebp-dev libgif-dev \
-  libexif-dev liblcms2-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
+ENV PKG_CONFIG_PATH /usr/local/lib/pkgconfig
+ENV LD_LIBRARY_PATH /lib64:/usr/lib64:/usr/local/lib
+ENV CGO_LDFLAGS_ALLOW "-s|-w"
 
-RUN curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer | bash -
+# Install dependencies
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    ca-certificates \
+    build-essential \
+    libtool \
+    libfftw3-dev \
+    libglib2.0-dev \
+    libexpat1-dev \
+    libjpeg62-turbo-dev \
+    libpng-dev \
+    libwebp-dev \
+    libgif-dev \
+    librsvg2-dev \
+    libexif-dev \
+    liblcms2-dev \
+    libheif-dev \
+    libtiff-dev \
+    libimagequant-dev
 
-RUN \
-  mkdir /root/vips \
-  && cd /root/vips \
-  && curl -s -S -L -o vips_releases.json "https://api.github.com/repos/libvips/libvips/releases" \
-  && for VIPS_VERSION in "8.7" "8.8" "8.9"; do \
-    mkdir $VIPS_VERSION \
-    && export VIPS_RELEASE=$(grep -m 1 "\"tag_name\": \"v$VIPS_VERSION." vips_releases.json | sed -E 's/.*"v([^"]+)".*/\1/') \
-    && echo "Building Vips $VIPS_RELEASE as $VIPS_VERSION" \
-    && curl -s -S -L -o $VIPS_RELEASE.tar.gz https://github.com/libvips/libvips/releases/download/v$VIPS_RELEASE/vips-$VIPS_RELEASE.tar.gz \
-    && tar -xzf $VIPS_RELEASE.tar.gz \
-    && cd vips-$VIPS_RELEASE \
+# Build ImageMagick
+RUN cd /root \
+  && mkdir ImageMagick \
+  && curl -Ls https://imagemagick.org/download/ImageMagick.tar.gz | tar -xz -C ImageMagick --strip-components 1 \
+  && cd ImageMagick \
+  && ./configure \
+    --enable-silent-rules \
+    --disable-static \
+    --disable-openmp \
+    --disable-deprecated \
+    --disable-docs \
+    --with-threads \
+    --without-magick-plus-plus \
+    --without-utilities \
+    --without-perl \
+    --without-bzlib \
+    --without-dps \
+    --without-freetype \
+    --without-fontconfig \
+    --without-jbig \
+    --without-jpeg \
+    --without-lcms \
+    --without-lzma \
+    --without-png \
+    --without-tiff \
+    --without-wmf \
+    --without-xml \
+    --without-webp \
+    --without-heic \
+    --without-pango \
+  && make install-strip \
+  && rm -rf /usr/local/lib/libMagickWand-7.*
+
+  RUN cd /root \
+    && export VIPS_VERSION=$(curl -s "https://api.github.com/repos/libvips/libvips/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/') \
+    && echo "Vips version: $VIPS_VERSION" \
+    && curl -Ls https://github.com/libvips/libvips/releases/download/v$VIPS_VERSION/vips-$VIPS_VERSION.tar.gz | tar -xz \
+    && cd vips-$VIPS_VERSION \
     && ./configure \
       --without-python \
       --without-OpenEXR \

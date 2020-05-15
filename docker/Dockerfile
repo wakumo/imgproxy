@@ -1,6 +1,12 @@
 FROM golang:1-buster
 LABEL maintainer="Sergey Alexandrovich <darthsim@gmail.com>"
 
+ARG VIPS_VERSION=8.9.2
+ARG IMAGEMAGICK_VERSION=7.0.9-20
+ARG QUANTIZR_VERSION=0.2.0
+ARG LIBHEIF_VERSION=1.6.2
+ARG LIBTIFF_VERSION=4.1.0
+
 ENV PKG_CONFIG_PATH /usr/local/lib/pkgconfig
 ENV LD_LIBRARY_PATH /lib64:/usr/lib64:/usr/local/lib
 ENV CGO_LDFLAGS_ALLOW "-s|-w"
@@ -12,8 +18,8 @@ RUN apt-get update \
     git \
     ca-certificates \
     build-essential \
+    cmake \
     libtool \
-    libfftw3-dev \
     libglib2.0-dev \
     libexpat1-dev \
     libjpeg62-turbo-dev \
@@ -23,15 +29,38 @@ RUN apt-get update \
     librsvg2-dev \
     libexif-dev \
     liblcms2-dev \
-    libheif-dev \
-    libtiff-dev \
-    libimagequant-dev
+    libde265-dev \
+    liblzma-dev \
+    libzstd-dev
+
+# Install quantizr
+RUN cd /root \
+  && curl -Ls https://github.com/DarthSim/quantizr/releases/download/v$QUANTIZR_VERSION/quantizr-imagequant-compat_$QUANTIZR_VERSION-0.deb \
+    > quantizr.deb \
+  && apt-get install -y ./quantizr.deb
+
+# Build libheif
+RUN cd /root \
+  && curl -Ls https://github.com/strukturag/libheif/releases/download/v$LIBHEIF_VERSION/libheif-$LIBHEIF_VERSION.tar.gz | tar -xz \
+  && cd libheif-$LIBHEIF_VERSION \
+  && ./configure \
+    --prefix=/usr/local \
+    --disable-static \
+    --disable-go \
+  && make install-strip
+
+# Build libtiff
+RUN cd /root \
+  && curl -Ls https://gitlab.com/libtiff/libtiff/-/archive/v$LIBTIFF_VERSION/libtiff-v$LIBTIFF_VERSION.tar.gz | tar -xz \
+  && cd libtiff-v$LIBTIFF_VERSION \
+  && cmake . \
+  && make \
+  && make install
 
 # Build ImageMagick
 RUN cd /root \
-  && mkdir ImageMagick \
-  && curl -Ls https://imagemagick.org/download/ImageMagick.tar.gz | tar -xz -C ImageMagick --strip-components 1 \
-  && cd ImageMagick \
+  && curl -Ls https://github.com/ImageMagick/ImageMagick/archive/$IMAGEMAGICK_VERSION.tar.gz | tar -xz \
+  && cd ImageMagick-$IMAGEMAGICK_VERSION \
   && ./configure \
     --enable-silent-rules \
     --disable-static \
@@ -62,8 +91,6 @@ RUN cd /root \
 
 # Build libvips
 RUN cd /root \
-  && export VIPS_VERSION=$(curl -s "https://api.github.com/repos/libvips/libvips/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/') \
-  && echo "Vips version: $VIPS_VERSION" \
   && curl -Ls https://github.com/libvips/libvips/releases/download/v$VIPS_VERSION/vips-$VIPS_VERSION.tar.gz | tar -xz \
   && cd vips-$VIPS_VERSION \
   && ./configure \
@@ -93,7 +120,6 @@ RUN apt-get update \
     bash \
     ca-certificates \
     libsm6 \
-    libfftw3-3 \
     libglib2.0-0 \
     libexpat1 \
     libjpeg62-turbo \
@@ -105,19 +131,18 @@ RUN apt-get update \
     librsvg2-2 \
     libexif12 \
     liblcms2-2 \
-    libheif1 \
-    libtiff5 \
-    libimagequant0 \
-    libjemalloc2 \
+    libde265-0 \
+    liblzma5 \
+    libzstd1 \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=0 /usr/local/bin/imgproxy /usr/local/bin/
 COPY --from=0 /usr/local/lib /usr/local/lib
+COPY --from=0 /usr/lib/libquantizr.so /usr/local/lib
 
 ENV VIPS_WARNING=0
-ENV MALLOC_ARENA_MAX=4
+ENV MALLOC_ARENA_MAX=2
 ENV LD_LIBRARY_PATH /lib64:/usr/lib64:/usr/local/lib
-ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
 
 CMD ["imgproxy"]
 

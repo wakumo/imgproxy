@@ -14,9 +14,25 @@ docker run -p 8080:8080 -it darthsim/imgproxy
 You can also build your own image. imgproxy is ready to be dockerized, plug and play:
 
 ```bash
-docker build -t imgproxy .
+docker build -f docker/Dockerfile -t imgproxy .
 docker run -p 8080:8080 -it imgproxy
 ```
+
+## Helm
+
+imgproxy can be easily deployed to your Kubernetes cluster using Helm and our official Helm chart:
+
+```bash
+helm repo add imgproxy https://helm.imgproxy.net/
+
+# With Helm 3
+helm upgrade -i imgproxy imgproxy/imgproxy
+
+# With Helm 2
+helm upgrade -i --name imgproxy imgproxy/imgproxy
+```
+
+Read the [chart's README](https://github.com/imgproxy/imgproxy-helm) for more info.
 
 ## Heroku
 
@@ -73,15 +89,18 @@ sudo apt-get install golang-go
 And finally, install imgproxy itself:
 
 ```bash
-CGO_LDFLAGS_ALLOW="-s|-w" go get -f -u github.com/imgproxy/imgproxy
+GO111MODULE=on \
+  CGO_LDFLAGS_ALLOW="-s|-w" \
+  go get -u github.com/imgproxy/imgproxy/v2
 ```
 
 ### macOS + Homebrew
 
 ```bash
 brew install vips go
-PKG_CONFIG_PATH="$(brew --prefix libffi)/lib/pkgconfig" \
+GO111MODULE=on \
+  PKG_CONFIG_PATH="$(brew --prefix libffi)/lib/pkgconfig" \
   CGO_LDFLAGS_ALLOW="-s|-w" \
   CGO_CFLAGS_ALLOW="-Xpreprocessor" \
-  go get -f -u github.com/imgproxy/imgproxy
+  go get -u github.com/imgproxy/imgproxy/v2
 ```

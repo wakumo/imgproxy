@@ -2,6 +2,83 @@
 
 ## [Unreleased]
 
+## [2.13.1] - 2020-05-06
+### Fixed
+- Fix and optimize processing of animated images.
+
+## [2.13.0] - 2020-04-22
+### Added
+- Fallback images.
+- [padding](https://docs.imgproxy.net/#/generating_the_url_advanced?id=padding) processing option.
+
+### Changed
+- Optimized memory usage. Especially when dealing with animated images.
+
+### Fixed
+- Fix crashes during animated images processing.
+
+## [2.12.0] - 2020-04-07
+### Addded
+- `IMGPROXY_PATH_PREFIX` config.
+- (pro) Video thumbnails.
+- (pro) [Getting the image info](https://docs.imgproxy.net/#/getting_the_image_info).
+
+### Changed
+- Improved `trim` processing option.
+- Quantizr updated to 0.2.0 in Docker image.
+
+
+## [2.11.0] - 2020-03-12
+### Changed
+- Replaced imagequant with [Quantizr](https://github.com/DarthSim/quantizr) in docker image.
+- Removed HEIC saving support.
+- Removed JBIG compressin support in TIFF.
+
+## [2.10.1] - 2020-02-27
+### Changed
+- `imgproxy -v` is replaced with `imgproxy version`.
+
+### Fixed
+- Fix loadind BMP stored in ICO.
+- Fix ambiguous HEIC magic bytes (MP4 videos has been detected as HEIC).
+- Fix build with libvips < 8.6.
+- Fix build with Go 1.14.
+- Fix go module naming. Use `github.com/imgproxy/imgproxy/v2` to build imgproxy from source.
+
+## [2.10.0] - 2020-02-13
+### Added
+- `IMGPROXY_NETWORK` config. Allows to bind on Unix socket.
+- `IMGPROXY_CACHE_CONTROL_PASSTHROUGH` config.
+- `imgproxy health` command.
+- (pro) `IMGPROXY_GIF_OPTIMIZE_FRAMES` & `IMGPROXY_GIF_OPTIMIZE_TRANSPARENCY` configs and `gif_options` processing option.
+- (pro) `IMGPROXY_CUSTOM_REQUEST_HEADERS`, `IMGPROXY_CUSTOM_RESPONSE_HEADERS`, and `IMGPROXY_CUSTOM_HEADERS_SEPARATOR` configs.
+
+### Changed
+
+- Better SVG detection.
+
+### Fixed
+- Fix detection of SVG starting with a comment.
+
+## [2.9.0] - 2020-01-30
+### Added
+- `trim` processing option.
+- `IMGPROXY_STRIP_METADATA` config.
+
+### Fixed
+- Fixed focus point crop calculation.
+
+## [2.8.2] - 2020-01-13
+### Changed
+- Optimized memory usage.
+
+### Fixed
+- Fixed `IMGPROXY_ALLOWED_SOURCES` config.
+
+## [2.8.1] - 2019-12-27
+### Fixed
+- Fix watermark top offset calculation.
+
 ## [2.8.0] - 2019-12-25
 ### Added
 - `IMGPROXY_LOG_LEVEL` config.

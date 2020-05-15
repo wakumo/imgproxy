@@ -26,7 +26,8 @@ echo $(xxd -g 2 -l 64 -p /dev/random | tr -d '\n')
 
 ## Server
 
-* `IMGPROXY_BIND`: TCP address and port to listen on. Default: `:8080`;
+* `IMGPROXY_BIND`: address and port or Unix socket to listen on. Default: `:8080`;
+* `IMGPROXY_NETWORK`: network to use. Known networks are `tcp`, `tcp4`, `tcp6`, `unix`, and `unixpacket`. Default: `tcp`;
 * `IMGPROXY_READ_TIMEOUT`: the maximum duration (in seconds) for reading the entire image request, including the body. Default: `10`;
 * `IMGPROXY_WRITE_TIMEOUT`: the maximum duration (in seconds) for writing the response. Default: `10`;
 * `IMGPROXY_KEEP_ALIVE_TIMEOUT`: the maximum duration (in seconds) to wait for the next request before closing the connection. When set to `0`, keep-alive is disabled. Default: `10`;
@@ -34,9 +35,14 @@ echo $(xxd -g 2 -l 64 -p /dev/random | tr -d '\n')
 * `IMGPROXY_CONCURRENCY`: the maximum number of image requests to be processed simultaneously. Default: number of CPU cores times two;
 * `IMGPROXY_MAX_CLIENTS`: the maximum number of simultaneous active connections. Default: `IMGPROXY_CONCURRENCY * 10`;
 * `IMGPROXY_TTL`: duration (in seconds) sent in `Expires` and `Cache-Control: max-age` HTTP headers. Default: `3600` (1 hour);
+* `IMGPROXY_CACHE_CONTROL_PASSTHROUGH`: when `true` and source image response contains `Expires` or `Cache-Control` headers, reuse those headers. Default: false;
 * `IMGPROXY_SO_REUSEPORT`: when `true`, enables `SO_REUSEPORT` socket option (currently on linux and darwin only);
+* `IMGPROXY_PATH_PREFIX`: URL path prefix. Example: when set to `/abc/def`, imgproxy URL will be `/abc/def/%signature/%processing_options/%source_url`. Default: blank.
 * `IMGPROXY_USER_AGENT`: User-Agent header that will be sent with source image request. Default: `imgproxy/%current_version`;
 * `IMGPROXY_USE_ETAG`: when `true`, enables using [ETag](https://en.wikipedia.org/wiki/HTTP_ETag) HTTP header for HTTP cache control. Default: false;
+* `IMGPROXY_CUSTOM_REQUEST_HEADERS`: <img class="pro-badge" src="assets/pro.svg" alt="pro" /> list of custom headers that imgproxy will send while requesting the source image, divided by `\;` (can be redefined by `IMGPROXY_CUSTOM_HEADERS_SEPARATOR`). Example: `X-MyHeader1=Lorem\;X-MyHeader2=Ipsum`;
+* `IMGPROXY_CUSTOM_RESPONSE_HEADERS`: <img class="pro-badge" src="assets/pro.svg" alt="pro" /> list of custom response headers, divided by `\;` (can be redefined by `IMGPROXY_CUSTOM_HEADERS_SEPARATOR`). Example: `X-MyHeader1=Lorem\;X-MyHeader2=Ipsum`;
+* `IMGPROXY_CUSTOM_HEADERS_SEPARATOR`: <img class="pro-badge" src="assets/pro.svg" alt="pro" /> string that will be used as a custom headers separator. Default: `\;`;
 
 ## Security
 
@@ -49,7 +55,11 @@ imgproxy can process animated images (GIF, WebP), but since this operation is pr
 
 * `IMGPROXY_MAX_ANIMATION_FRAMES`: the maximum of animated image frames to being processed. Default: `1`.
 
-**Note:** imgproxy summarizes all frames resolutions while checking source image resolution.
+**📝Note:** imgproxy summarizes all frames resolutions while checking source image resolution.
+
+imgproxy reads some amount of bytes to check if the source image is SVG. By default it reads maximum of 32KB, but you can change this:
+
+* `IMGPROXY_MAX_SVG_CHECK_BYTES`: the maximum number of bytes imgproxy will read to recognize SVG. If imgproxy can't recognize your SVG, try to increase this number. Default: `32768` (32KB)
 
 You can also specify a secret to enable authorization with the HTTP `Authorization` header for use in production environments:
 
@@ -62,6 +72,8 @@ imgproxy does not send CORS headers by default. Specify allowed origin to enable
 You can limit allowed source URLs:
 
 * `IMGPROXY_ALLOWED_SOURCES`: whitelist of source image URLs prefixes divided by comma. When blank, imgproxy allows all source image URLs. Example: `s3://,https://example.com/,local://`. Default: blank.
+
+**⚠️Warning:** Be careful when using this config to limit source URL hosts, and always add a trailing slash after the host. Bad: `http://example.com`, good: `http://example.com/`. If you don't add a trailing slash, `http://example.com@baddomain.com` will be an allowed URL but the request will be made to `baddomain.com`.
 
 When you use imgproxy in a development environment, it can be useful to ignore SSL verification:
 
@@ -94,13 +106,18 @@ Also you may want imgproxy to respond with the same error message that it writes
   * `7`: Table from A Visual Detection Model for DCT Coefficient Quantization (1993);
   * `8`: Table from An Improved Detection Model for DCT Coefficient Quantization (1993).
 
-**Note:** `IMGPROXY_JPEG_TRELLIS_QUANT`, `IMGPROXY_JPEG_OVERSHOOT_DERINGING`, `IMGPROXY_JPEG_OPTIMIZE_SCANS`, and `IMGPROXY_JPEG_QUANT_TABLE` require libvips to be built with [MozJPEG](https://github.com/mozilla/mozjpeg) since standard libjpeg doesn't support those optimizations.
+**📝Note:** `IMGPROXY_JPEG_TRELLIS_QUANT`, `IMGPROXY_JPEG_OVERSHOOT_DERINGING`, `IMGPROXY_JPEG_OPTIMIZE_SCANS`, and `IMGPROXY_JPEG_QUANT_TABLE` require libvips to be built with [MozJPEG](https://github.com/mozilla/mozjpeg) since standard libjpeg doesn't support those optimizations.
 
 ### Advanced PNG compression
 
 * `IMGPROXY_PNG_INTERLACED`: when true, enables interlaced PNG compression. Default: false;
-* `IMGPROXY_PNG_QUANTIZE`: when true, enables PNG quantization. libvips should be built with libimagequant support. Default: false;
+* `IMGPROXY_PNG_QUANTIZE`: when true, enables PNG quantization. libvips should be built with [Quantizr](https://github.com/DarthSim/quantizr) or libimagequant support. Default: false;
 * `IMGPROXY_PNG_QUANTIZATION_COLORS`: maximum number of quantization palette entries. Should be between 2 and 256. Default: 256;
+
+### Advanced GIF compression
+
+* `IMGPROXY_GIF_OPTIMIZE_FRAMES`: <img class="pro-badge" src="assets/pro.svg" alt="pro" /> when true, enables GIF frames optimization. This may produce a smaller result, but may increase compression time.
+* `IMGPROXY_GIF_OPTIMIZE_TRANSPARENCY`: <img class="pro-badge" src="assets/pro.svg" alt="pro" /> when true, enables GIF transparency optimization. This may produce a smaller result, but may increase compression time.
 
 ## WebP support detection
 
@@ -111,7 +128,7 @@ imgproxy can use the `Accept` HTTP header to detect if the browser supports WebP
 
 When WebP support detection is enabled, please take care to configure your CDN or caching proxy to take the `Accept` HTTP header into account while caching.
 
-**Warning**: Headers cannot be signed. This means that an attacker can bypass your CDN cache by changing the `Accept` HTTP headers. Have this in mind when configuring your production caching setup.
+**⚠️Warning:** Headers cannot be signed. This means that an attacker can bypass your CDN cache by changing the `Accept` HTTP headers. Have this in mind when configuring your production caching setup.
 
 ## Client Hints support
 
@@ -119,7 +136,14 @@ imgproxy can use the `Width`, `Viewport-Width` or `DPR` HTTP headers to determin
 
 * `IMGPROXY_ENABLE_CLIENT_HINTS`: enables Client Hints support to determine default width and DPR options. Read [here](https://developers.google.com/web/updates/2015/09/automating-resource-selection-with-client-hints) details about Client Hints.
 
-**Warning**: Headers cannot be signed. This means that an attacker can bypass your CDN cache by changing the `Width`, `Viewport-Width` or `DPR` HTTP headers. Have this in mind when configuring your production caching setup.
+**⚠️Warning:** Headers cannot be signed. This means that an attacker can bypass your CDN cache by changing the `Width`, `Viewport-Width` or `DPR` HTTP headers. Have this in mind when configuring your production caching setup.
+
+## Video thumbnails
+
+imgproxy Pro can extract specific frames of videos to create thumbnails. The feature is disabled by default, but can be enabled with `IMGPROXY_ENABLE_VIDEO_THUMBNAILS`.
+
+* `IMGPROXY_ENABLE_VIDEO_THUMBNAILS`: <img class="pro-badge" src="assets/pro.svg" alt="pro" /> then true, enables video thumbnails generation. Default: false;
+* `IMGPROXY_VIDEO_THUMBNAIL_SECOND`: <img class="pro-badge" src="assets/pro.svg" alt="pro" /> the timestamp of the frame in seconds that will be used for a thumbnail. Default: 1.
 
 ## Watermark
 
@@ -130,6 +154,14 @@ imgproxy can use the `Width`, `Viewport-Width` or `DPR` HTTP headers to determin
 * `IMGPROXY_WATERMARKS_CACHE_SIZE`: <img class="pro-badge" src="assets/pro.svg" alt="pro" /> size of custom watermarks cache. When set to `0`, watermarks cache is disabled. By default 256 watermarks are cached.
 
 Read more about watermarks in the [Watermark](watermark.md) guide.
+
+## Fallback image
+
+You can set up a fallback image that will be used in case imgproxy can't fetch the requested one. Use one of the following variables:
+
+* `IMGPROXY_FALLBACK_IMAGE_DATA`: Base64-encoded image data. You can easily calculate it with `base64 tmp/fallback.png | tr -d '\n'`;
+* `IMGPROXY_FALLBACK_IMAGE_PATH`: path to the locally stored image;
+* `IMGPROXY_FALLBACK_IMAGE_URL`: fallback image URL.
 
 ## Presets
 
@@ -236,11 +268,11 @@ imgproxy can send logs to syslog, but this feature is disabled by default. To en
 * `IMGPROXY_SYSLOG_ADDRESS`: address of the syslog service. Not used if `IMGPROXY_SYSLOG_NETWORK` is blank. Default: blank;
 * `IMGPROXY_SYSLOG_TAG`: specific syslog tag. Default: `imgproxy`;
 
-**Note:** imgproxy always uses structured log format for syslog.
+**📝Note:** imgproxy always uses structured log format for syslog.
 
 ## Memory usage tweaks
 
-**Warning:** It's highly recommended to read [Memory usage tweaks](memory_usage_tweaks.md) guide before changing this settings.
+**⚠️Warning:** It's highly recommended to read [Memory usage tweaks](memory_usage_tweaks.md) guide before changing this settings.
 
 * `IMGPROXY_DOWNLOAD_BUFFER_SIZE`: the initial size (in bytes) of a single download buffer. When zero, initializes empty download buffers. Default: `0`;
 * `IMGPROXY_GZIP_BUFFER_SIZE`: the initial size (in bytes) of a single GZip buffer. When zero, initializes empty GZip buffers. Makes sense only when GZip compression is enabled. Default: `0`;
@@ -253,3 +285,4 @@ imgproxy can send logs to syslog, but this feature is disabled by default. To en
 * `IMGPROXY_USE_LINEAR_COLORSPACE`: when `true`, imgproxy will process images in linear colorspace. This will slow down processing. Note that images won't be fully processed in linear colorspace while shrink-on-load is enabled (see below).
 * `IMGPROXY_DISABLE_SHRINK_ON_LOAD`: when `true`, disables shrink-on-load for JPEG and WebP. Allows to process the whole image in linear colorspace but dramatically slows down resizing and increases memory usage when working with large images.
 * `IMGPROXY_APPLY_UNSHARPEN_MASKING`: <img class="pro-badge" src="assets/pro.svg" alt="pro" /> when `true`, imgproxy will apply unsharpen masking to the resulting image if one is smaller than the source. Default: `true`.
+* `IMGPROXY_STRIP_METADATA`: whether to strip all metadata (EXIF, IPTC, etc.) from JPEG and WebP output images. Default: `true`.

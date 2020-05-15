@@ -37,6 +37,9 @@
 #define VIPS_SUPPORT_COMPOSITE \
   (VIPS_MAJOR_VERSION > 8 || (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION >= 6))
 
+#define VIPS_SUPPORT_FIND_TRIM \
+  (VIPS_MAJOR_VERSION > 8 || (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION >= 6))
+
 #define EXIF_ORIENTATION "exif-ifd0-Orientation"
 
 #if (VIPS_MAJOR_VERSION > 8 || (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION >= 8))
@@ -104,8 +107,6 @@ vips_type_find_save_go(int imgtype) {
     return vips_type_find("VipsOperation", "magicksave_buffer");
   case (ICO):
     return vips_type_find("VipsOperation", "magicksave_buffer");
-  case (HEIC):
-    return vips_type_find("VipsOperation", "heifsave_buffer");
   case (BMP):
     return vips_type_find("VipsOperation", "magicksave_buffer");
   case (TIFF):
@@ -338,7 +339,12 @@ vips_support_builtin_icc() {
 
 int
 vips_icc_import_go(VipsImage *in, VipsImage **out, char *profile) {
-  return vips_icc_import(in, out, "input_profile", profile, "embedded", TRUE, "pcs", VIPS_PCS_XYZ, NULL);
+  if (vips_icc_import(in, out, "input_profile", profile, "embedded", TRUE, "pcs", VIPS_PCS_XYZ, NULL))
+    return 1;
+
+  vips_image_remove(*out, VIPS_META_ICC_NAME);
+
+  return 0;
 }
 
 int
@@ -387,6 +393,82 @@ vips_flatten_go(VipsImage *in, VipsImage **out, double r, double g, double b) {
 int
 vips_extract_area_go(VipsImage *in, VipsImage **out, int left, int top, int width, int height) {
   return vips_extract_area(in, out, left, top, width, height, NULL);
+}
+
+int
+vips_trim(VipsImage *in, VipsImage **out, double threshold,
+          gboolean smart, double r, double g, double b,
+          gboolean equal_hor, gboolean equal_ver) {
+#if VIPS_SUPPORT_FIND_TRIM
+  VipsImage *tmp;
+
+  if (vips_image_hasalpha(in)) {
+    if (vips_flatten(in, &tmp, NULL))
+      return 1;
+  } else {
+    if (vips_copy(in, &tmp, NULL))
+      return 1;
+  }
+
+  double *bg;
+  int bgn;
+  VipsArrayDouble *bga;
+
+  if (smart) {
+    if (vips_getpoint(tmp, &bg, &bgn, 0, 0, NULL)) {
+      clear_image(&tmp);
+      return 1;
+    }
+    bga = vips_array_double_new(bg, bgn);
+  } else {
+    bga = vips_array_double_newv(3, r, g, b);
+    bg = 0;
+  }
+
+  int left, right, top, bot, width, height, diff;
+
+  if (vips_find_trim(tmp, &left, &top, &width, &height, "background", bga, "threshold", threshold, NULL)) {
+    clear_image(&tmp);
+    vips_area_unref((VipsArea *)bga);
+    g_free(bg);
+    return 1;
+  }
+
+  if (equal_hor) {
+    right = in->Xsize - left - width;
+    diff = right - left;
+    if (diff > 0) {
+      width += diff;
+    } else if (diff < 0) {
+      left = right;
+      width -= diff;
+    }
+  }
+
+  if (equal_ver) {
+    bot = in->Ysize - top - height;
+    diff = bot - top;
+    if (diff > 0) {
+      height += diff;
+    } else if (diff < 0) {
+      top = bot;
+      height -= diff;
+    }
+  }
+
+  clear_image(&tmp);
+  vips_area_unref((VipsArea *)bga);
+  g_free(bg);
+
+  if (width == 0 || height == 0) {
+    return vips_copy(in, out, NULL);
+  }
+
+  return vips_extract_area(in, out, left, top, width, height, NULL);
+#else
+  vips_error("vips_trim", "Trim is not supported (libvips 8.6+ reuired)");
+  return 1;
+#endif
 }
 
 int
@@ -470,8 +552,8 @@ vips_arrayjoin_go(VipsImage **in, VipsImage **out, int n) {
 }
 
 int
-vips_jpegsave_go(VipsImage *in, void **buf, size_t *len, int quality, int interlace) {
-  return vips_jpegsave_buffer(in, buf, len, "profile", "none", "Q", quality, "strip", TRUE, "optimize_coding", TRUE, "interlace", interlace, NULL);
+vips_jpegsave_go(VipsImage *in, void **buf, size_t *len, int quality, int interlace, gboolean strip) {
+  return vips_jpegsave_buffer(in, buf, len, "profile", "none", "Q", quality, "strip", strip, "optimize_coding", TRUE, "interlace", interlace, NULL);
 }
 
 int
@@ -489,8 +571,8 @@ vips_pngsave_go(VipsImage *in, void **buf, size_t *len, int interlace, int quant
 }
 
 int
-vips_webpsave_go(VipsImage *in, void **buf, size_t *len, int quality) {
-  return vips_webpsave_buffer(in, buf, len, "Q", quality, "strip", TRUE, NULL);
+vips_webpsave_go(VipsImage *in, void **buf, size_t *len, int quality, gboolean strip) {
+  return vips_webpsave_buffer(in, buf, len, "Q", quality, "strip", strip, NULL);
 }
 
 int
@@ -509,16 +591,6 @@ vips_icosave_go(VipsImage *in, void **buf, size_t *len) {
   return vips_magicksave_buffer(in, buf, len, "format", "ico", NULL);
 #else
   vips_error("vips_icosave_go", "Saving ICO is not supported (libvips 8.7+ reuired)");
-  return 1;
-#endif
-}
-
-int
-vips_heifsave_go(VipsImage *in, void **buf, size_t *len, int quality) {
-#if VIPS_SUPPORT_HEIF
-  return vips_heifsave_buffer(in, buf, len, "Q", quality, NULL);
-#else
-  vips_error("vips_heifsave_go", "Saving HEIF is not supported (libvips 8.8+ reuired)");
   return 1;
 #endif
 }

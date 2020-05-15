@@ -9,6 +9,7 @@ package main
 import "C"
 import (
 	"context"
+	"fmt"
 	"math"
 	"os"
 	"runtime"
@@ -43,13 +44,13 @@ const (
 	vipsAngleD270 = C.VIPS_ANGLE_D270
 )
 
-func initVips() {
+func initVips() error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
 	if err := C.vips_initialize(); err != 0 {
 		C.vips_shutdown()
-		logFatal("unable to start vips!")
+		return fmt.Errorf("unable to start vips!")
 	}
 
 	// Disable libvips cache. Since processing pipeline is fine tuned, we won't get much profit from it.
@@ -95,10 +96,13 @@ func initVips() {
 	vipsConf.WatermarkOpacity = C.double(conf.WatermarkOpacity)
 
 	if err := vipsLoadWatermark(); err != nil {
-		logFatal(err.Error())
+		C.vips_shutdown()
+		return fmt.Errorf("Can't load watermark: %s", err)
 	}
 
 	vipsCollectMetrics()
+
+	return nil
 }
 
 func shutdownVips() {
@@ -128,6 +132,13 @@ func vipsError() error {
 func vipsLoadWatermark() (err error) {
 	watermark, err = getWatermarkData()
 	return
+}
+
+func gbool(b bool) C.gboolean {
+	if b {
+		return C.gboolean(1)
+	}
+	return C.gboolean(0)
 }
 
 func (img *vipsImage) Width() int {
@@ -170,7 +181,7 @@ func (img *vipsImage) Load(data []byte, imgtype imageType, shrink int, scale flo
 	return nil
 }
 
-func (img *vipsImage) Save(imgtype imageType, quality int) ([]byte, context.CancelFunc, error) {
+func (img *vipsImage) Save(imgtype imageType, quality int, stripMeta bool) ([]byte, context.CancelFunc, error) {
 	var ptr unsafe.Pointer
 
 	cancel := func() {
@@ -183,17 +194,15 @@ func (img *vipsImage) Save(imgtype imageType, quality int) ([]byte, context.Canc
 
 	switch imgtype {
 	case imageTypeJPEG:
-		err = C.vips_jpegsave_go(img.VipsImage, &ptr, &imgsize, C.int(quality), vipsConf.JpegProgressive)
+		err = C.vips_jpegsave_go(img.VipsImage, &ptr, &imgsize, C.int(quality), vipsConf.JpegProgressive, gbool(stripMeta))
 	case imageTypePNG:
 		err = C.vips_pngsave_go(img.VipsImage, &ptr, &imgsize, vipsConf.PngInterlaced, vipsConf.PngQuantize, vipsConf.PngQuantizationColors)
 	case imageTypeWEBP:
-		err = C.vips_webpsave_go(img.VipsImage, &ptr, &imgsize, C.int(quality))
+		err = C.vips_webpsave_go(img.VipsImage, &ptr, &imgsize, C.int(quality), gbool(stripMeta))
 	case imageTypeGIF:
 		err = C.vips_gifsave_go(img.VipsImage, &ptr, &imgsize)
 	case imageTypeICO:
 		err = C.vips_icosave_go(img.VipsImage, &ptr, &imgsize)
-	case imageTypeHEIC:
-		err = C.vips_heifsave_go(img.VipsImage, &ptr, &imgsize, C.int(quality))
 	case imageTypeBMP:
 		err = C.vips_bmpsave_go(img.VipsImage, &ptr, &imgsize)
 	case imageTypeTIFF:
@@ -312,6 +321,8 @@ func (img *vipsImage) Rotate(angle int) error {
 		return vipsError()
 	}
 
+	C.vips_autorot_remove_angle(tmp)
+
 	C.swap_and_clear(&img.VipsImage, tmp)
 	return nil
 }
@@ -349,6 +360,23 @@ func (img *vipsImage) SmartCrop(width, height int) error {
 	var tmp *C.VipsImage
 
 	if C.vips_smartcrop_go(img.VipsImage, &tmp, C.int(width), C.int(height)) != 0 {
+		return vipsError()
+	}
+
+	C.swap_and_clear(&img.VipsImage, tmp)
+	return nil
+}
+
+func (img *vipsImage) Trim(threshold float64, smart bool, color rgbColor, equalHor bool, equalVer bool) error {
+	var tmp *C.VipsImage
+
+	if err := img.CopyMemory(); err != nil {
+		return err
+	}
+
+	if C.vips_trim(img.VipsImage, &tmp, C.double(threshold),
+		gbool(smart), C.double(color.R), C.double(color.G), C.double(color.B),
+		gbool(equalHor), gbool(equalVer)) != 0 {
 		return vipsError()
 	}
 

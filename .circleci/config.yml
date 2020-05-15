@@ -38,6 +38,44 @@ jobs:
           command: |
             K8S_CONTAINER_NAME=$(echo $(kubectl --namespace=${K8S_NAMESPAGE} get deployment ${K8S_DEPLOYMENT_NAME} -o json | jq '.spec.template.spec.containers[0].name') | sed 's#"##g')
             kubectl set image deployment/${K8S_DEPLOYMENT_NAME} ${K8S_CONTAINER_NAME}=gcr.io/${GCP_PROJECT}/$(tr [A-Z] [a-z] <<< ${CIRCLE_PROJECT_REPONAME}):${CIRCLE_TAG} --namespace=${K8S_NAMESPAGE}
+  deploy_stg:
+    docker:
+      - image: gcr.io/cloud-builders/gcloud
+    environment:
+      GCP_PROJECT: sumica-production
+      GCP_ZONE: asia-northeast1-a
+
+      K8S_CLUSTER: staging-cluster
+      K8S_NAMESPAGE: staging
+      K8S_DEPLOYMENT_NAME: imgproxy
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            apt-get update && apt-get install python python-pip jq -y
+            gcloud --quiet components update
+            gcloud --quiet components update kubectl
+      - run:
+          name: Auth gcloud
+          command: |
+            echo $GCLOUD_PROD_SERVICE_KEY | base64 --decode --ignore-garbage > ${HOME}/gcp_key.json
+            gcloud auth activate-service-account --key-file ${HOME}/gcp_key.json
+            gcloud config set project ${GCP_PROJECT}
+
+      - run:
+          name: Build prod image
+          command: gcloud builds submit . --config ./.circleci/cloudbuild.yaml --substitutions _REPO_NAME=$(tr [A-Z] [a-z] <<< ${CIRCLE_PROJECT_REPONAME}),_TAG_NAME=${CIRCLE_BRANCH}
+
+      - run:
+          name: Get credentials
+          command: gcloud container clusters get-credentials ${K8S_CLUSTER} --quiet --zone ${GCP_ZONE} --project ${GCP_PROJECT}
+
+      # - run:
+      #     name: rollout-update
+      #     command: |
+      #       K8S_CONTAINER_NAME=$(echo $(kubectl --namespace=${K8S_NAMESPAGE} get deployment ${K8S_DEPLOYMENT_NAME} -o json | jq '.spec.template.spec.containers[0].name') | sed 's#"##g')
+      #       kubectl set image deployment/${K8S_DEPLOYMENT_NAME} ${K8S_CONTAINER_NAME}=gcr.io/${GCP_PROJECT}/$(tr [A-Z] [a-z] <<< ${CIRCLE_PROJECT_REPONAME}):${CIRCLE_BRANCH} --namespace=${K8S_NAMESPAGE}
 
 workflows:
     version: 2
@@ -49,3 +87,9 @@ workflows:
                 only: /prod-\d+.\d+.\d+/
               branches:
                 ignore: /.*/
+    deploy_stg:
+      jobs:
+        - deploy_stg:
+            filters:
+              branches:
+                only: master

@@ -9,7 +9,7 @@ jobs:
 
       K8S_CLUSTER: production-cluster
       K8S_NAMESPAGE: production
-      K8S_DEPLOYMENT_NAME: imgproxy
+      K8S_DEPLOYMENT_NAME: imageproxy
     steps:
       - checkout
       - run:
@@ -47,7 +47,7 @@ jobs:
 
       K8S_CLUSTER: staging-cluster
       K8S_NAMESPAGE: staging
-      K8S_DEPLOYMENT_NAME: imgproxy
+      K8S_DEPLOYMENT_NAME: imageproxy
     steps:
       - checkout
       - run:
@@ -71,11 +71,11 @@ jobs:
           name: Get credentials
           command: gcloud container clusters get-credentials ${K8S_CLUSTER} --quiet --zone ${GCP_ZONE} --project ${GCP_PROJECT}
 
-      # - run:
-      #     name: rollout-update
-      #     command: |
-      #       K8S_CONTAINER_NAME=$(echo $(kubectl --namespace=${K8S_NAMESPAGE} get deployment ${K8S_DEPLOYMENT_NAME} -o json | jq '.spec.template.spec.containers[0].name') | sed 's#"##g')
-      #       kubectl set image deployment/${K8S_DEPLOYMENT_NAME} ${K8S_CONTAINER_NAME}=gcr.io/${GCP_PROJECT}/$(tr [A-Z] [a-z] <<< ${CIRCLE_PROJECT_REPONAME}):${CIRCLE_BRANCH} --namespace=${K8S_NAMESPAGE}
+      - run:
+          name: rollout-update
+          command: |
+            K8S_CONTAINER_NAME=$(echo $(kubectl --namespace=${K8S_NAMESPAGE} get deployment ${K8S_DEPLOYMENT_NAME} -o json | jq '.spec.template.spec.containers[0].name') | sed 's#"##g')
+            kubectl set image deployment/${K8S_DEPLOYMENT_NAME} ${K8S_CONTAINER_NAME}=gcr.io/${GCP_PROJECT}/$(tr [A-Z] [a-z] <<< ${CIRCLE_PROJECT_REPONAME}):${CIRCLE_BRANCH} --namespace=${K8S_NAMESPAGE}
 
 workflows:
     version: 2

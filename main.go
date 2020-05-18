@@ -62,7 +62,7 @@ func run() error {
 
 		for range time.Tick(time.Duration(conf.FreeMemoryInterval) * time.Second) {
 			freeMemory()
-			println("clearrrrrrr==================================")
+			
 			if logMemStats {
 				var m runtime.MemStats
 				runtime.ReadMemStats(&m)

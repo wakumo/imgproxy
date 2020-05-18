@@ -15,6 +15,7 @@ import "runtime/debug"
 
 func freeMemory() {
 	debug.FreeOSMemory()
+	println("clearrrrrrr================================== linux")
 
 	C.malloc_trim(0)
 }

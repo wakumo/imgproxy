@@ -1,6 +1,12 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Add `IMGPROXY_PROMETHEUS_NAMESPACE` config.
+
+### Changed
+- Better for libvips memory metrics for Prometheus.
+- Docker image includes the latest versions of dependencies.
 
 ## [2.13.1] - 2020-05-06
 ### Fixed
@@ -26,7 +32,6 @@
 ### Changed
 - Improved `trim` processing option.
 - Quantizr updated to 0.2.0 in Docker image.
-
 
 ## [2.11.0] - 2020-03-12
 ### Changed

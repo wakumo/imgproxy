@@ -149,8 +149,12 @@ func handleProcessing(reqID string, rw http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-
+	fmt.Println("============================== DOWNLOAD IMAGE ====== processing_handler.go:152 ")
+	b_s := time.Now().UnixNano() / int64(time.Millisecond)
 	ctx, downloadcancel, err := downloadImage(ctx)
+	b_e := time.Now().UnixNano() / int64(time.Millisecond)
+	fmt.Println(b_e - b_s)
+
 	defer downloadcancel()
 	if err != nil {
 		if newRelicEnabled {

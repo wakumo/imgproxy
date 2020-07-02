@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"os"
+	"time"
 
 	"github.com/imgproxy/imgproxy/v2/structdiff"
 )
@@ -283,7 +284,8 @@ func colorFromHex(hexcolor string) (rgbColor, error) {
 
 func decodeBase64URL(parts []string) (string, string, error) {
 	var format string
-
+	fmt.Println("============================== DECODE BASE64 ====== processing_options.go:287 ")
+	b_s := time.Now().UnixNano() / int64(time.Millisecond)
 	encoded := strings.Join(parts, "")
 	urlParts := strings.Split(encoded, ".")
 
@@ -307,7 +309,8 @@ func decodeBase64URL(parts []string) (string, string, error) {
 	imageURL = os.Getenv("GCS_HOST") + imageURL
 
 	fullURL := fmt.Sprintf("%s%s", conf.BaseURL, string(imageURL))
-
+	b_e := time.Now().UnixNano() / int64(time.Millisecond)
+	fmt.Println(b_e - b_s)
 	return fullURL, format, nil
 }
 

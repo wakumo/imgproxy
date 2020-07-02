@@ -187,7 +187,7 @@ func handleProcessing(reqID string, rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
+        b_k := time.Now().UnixNano() / int64(time.Millisecond)
 	checkTimeout(ctx)
 
 	imageData, processcancel, err := processImage(ctx)
@@ -201,8 +201,13 @@ func handleProcessing(reqID string, rw http.ResponseWriter, r *http.Request) {
 		}
 		panic(err)
 	}
-
+        b_l := time.Now().UnixNano() / int64(time.Millisecond)
+        fmt.Println("============================== check process ====== processing_handler.go:187 ")
+        fmt.Println(b_l - b_k)
 	checkTimeout(ctx)
-
+        b_n := time.Now().UnixNano() / int64(time.Millisecond)
 	respondWithImage(ctx, reqID, r, rw, imageData)
+        b_m := time.Now().UnixNano() / int64(time.Millisecond)
+        fmt.Println("============================== check render ====== processing_handler.go:209 ")
+        fmt.Println(b_m - b_n)
 }

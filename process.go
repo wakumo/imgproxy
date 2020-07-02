@@ -246,10 +246,13 @@ func prepareWatermark(wm *vipsImage, wmData *imageData, opts *watermarkOptions, 
 		po.Width = maxInt(scaleInt(imgWidth, opts.Scale), 1)
 		po.Height = maxInt(scaleInt(imgHeight, opts.Scale), 1)
 	}
-
+	fmt.Println("============================== TransformImage ====== process.go:249 ")
+	b_s := time.Now().UnixNano() / int64(time.Millisecond)
 	if err := transformImage(context.Background(), wm, wmData.Data, po, wmData.Type); err != nil {
 		return err
 	}
+	b_e := time.Now().UnixNano() / int64(time.Millisecond)
+	fmt.Println(b_e - b_s)
 
 	if err := wm.EnsureAlpha(); err != nil {
 		return nil
@@ -745,7 +748,11 @@ func processImage(ctx context.Context) ([]byte, context.CancelFunc, error) {
 	}
 
 	if animationSupport && img.IsAnimated() {
+		fmt.Println("============================== TRANSFORM ANIMATED ====== process.go:751 ")
+		b_s := time.Now().UnixNano() / int64(time.Millisecond)
 		if err := transformAnimated(ctx, img, imgdata.Data, po, imgdata.Type); err != nil {
+			b_e := time.Now().UnixNano() / int64(time.Millisecond)
+			fmt.Println(b_e - b_s)
 			return nil, func() {}, err
 		}
 	} else {

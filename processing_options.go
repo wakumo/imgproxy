@@ -651,6 +651,8 @@ func applyTrimOption(po *processingOptions, args []string) error {
 }
 
 func applyQualityOption(po *processingOptions, args []string) error {
+	fmt.Println("============================== apply quality ====== processing_options.go:654 ")
+	b_s := time.Now().UnixNano() / int64(time.Millisecond)
 	if len(args) > 1 {
 		return fmt.Errorf("Invalid quality arguments: %v", args)
 	}
@@ -660,7 +662,9 @@ func applyQualityOption(po *processingOptions, args []string) error {
 	} else {
 		return fmt.Errorf("Invalid quality: %s", args[0])
 	}
-
+	b_e := time.Now().UnixNano() / int64(time.Millisecond)
+	fmt.Println(b_e - b_s)
+	
 	return nil
 }
 

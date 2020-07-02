@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"math"
 	"runtime"
-
+	"time"
+	
 	"github.com/imgproxy/imgproxy/v2/imagemeta"
 )
 
